@@ -1,7 +1,6 @@
 /**
- * AiRPubs OJS Enhancement Script v1
- * With fetch() - gets affiliations from article detail page
- * Works on servers that don't block same-origin fetch
+ * AiRPubs OJS Enhancement Script - UMY Version
+ * Without abstract/PDF view stats
  */
 (function() {
     'use strict';
@@ -27,8 +26,6 @@
             '.airpubs-doi a { color:#4b5563; font-size:13px; text-decoration:none; display:inline-flex; align-items:center; gap:6px; }' +
             '.airpubs-doi a:hover { color:#1565c0; }' +
             '.airpubs-doi-badge { display:inline-block; background:#f59e0b; color:#fff; font-size:10px; font-weight:700; padding:2px 6px; border-radius:3px; }' +
-            '.airpubs-stats-row { display:flex; gap:20px; margin-bottom:10px; }' +
-            '.airpubs-stat { font-size:13px; color:#6b7280; display:inline-flex; align-items:center; gap:5px; }' +
             '';
         document.head.appendChild(css);
 
@@ -41,15 +38,8 @@
         var articles = document.querySelectorAll('.obj_article_summary');
         if (!articles.length) return;
 
-        // Helper function to build bottom section
-        function buildBottom(article, galleys, pages, doiText, abstractViews, pdfViews) {
+        function buildBottom(article, galleys, pages, doiText) {
             var bottomHtml = '<div class="airpubs-extra">';
-            // Stats row
-            bottomHtml += '<div class="airpubs-stats-row">';
-            bottomHtml += '<span class="airpubs-stat"><i class="fas fa-chart-line"></i> Abstract : ' + abstractViews + '</span>';
-            bottomHtml += '<span class="airpubs-stat"><i class="fas fa-download"></i> PDF : ' + pdfViews + '</span>';
-            bottomHtml += '</div>';
-            // Galley + DOI row
             bottomHtml += '<div class="airpubs-doi-row">';
             bottomHtml += '<div class="airpubs-galley-btns">';
             for (var g = 0; g < galleys.length; g++) {
@@ -79,7 +69,6 @@
             var pagesDiv = article.querySelector('.meta .pages');
             var galleysList = article.querySelector('.galleys_links');
 
-            // Read data first
             var pages = pagesDiv ? pagesDiv.textContent.trim() : '';
             var galleys = [];
             if (galleysList) {
@@ -89,18 +78,15 @@
                 }
             }
 
-            // Remove originals
             if (pagesDiv && pagesDiv.parentNode) pagesDiv.parentNode.removeChild(pagesDiv);
             if (galleysList && galleysList.parentNode) galleysList.parentNode.removeChild(galleysList);
 
-            // Fetch article detail for affiliations and DOI
             fetch(articleUrl).then(function(res) {
                 return res.text();
             }).then(function(html) {
                 var parser = new DOMParser();
                 var doc = parser.parseFromString(html, 'text/html');
 
-                // Get authors from meta tags
                 var metaAuthors = doc.querySelectorAll('meta[name="citation_author"]');
                 var metaInst = doc.querySelectorAll('meta[name="citation_author_institution"]');
                 var names = [], affs = [];
@@ -112,7 +98,6 @@
                     }
                 }
 
-                // Build authors HTML
                 if (names.length > 0 && authorsDiv) {
                     var authHtml = '<div class="airpubs-authors"><i class="fas fa-users"></i> ';
                     for (var j = 0; j < names.length; j++) {
@@ -131,28 +116,12 @@
                     authorsDiv.innerHTML = authHtml;
                 }
 
-                // Get DOI from meta
                 var doiMeta = doc.querySelector('meta[name="DC.Identifier.DOI"]');
                 var doiText = doiMeta ? doiMeta.getAttribute('content') : '';
 
-                // Get article ID for stats API
-                var artIdMatch = articleUrl.match(/\/view\/(\d+)/);
-                var artId = artIdMatch ? artIdMatch[1] : '';
-                var journalPath = window.location.pathname.match(/\/index\.php\/([^\/]+)/);
-                var jPath = journalPath ? journalPath[1] : '';
-
-                // Fetch stats from API
-                var statsUrl = '/index.php/' + jPath + '/api/v1/stats/publications/' + artId;
-                fetch(statsUrl).then(function(sr) { return sr.json(); }).then(function(stats) {
-                    var abstractViews = stats.abstractViews || 0;
-                    var pdfViews = stats.pdfViews || stats.galleyViews || 0;
-                    buildBottom(article, galleys, pages, doiText, abstractViews, pdfViews);
-                }).catch(function() {
-                    buildBottom(article, galleys, pages, doiText, 0, 0);
-                });
+                buildBottom(article, galleys, pages, doiText);
 
             }).catch(function() {
-                // Fetch failed - fallback without affiliations/DOI
                 if (authorsDiv) {
                     var authorsText = authorsDiv.textContent.trim();
                     var authorNames = authorsText.split(',');
@@ -167,7 +136,7 @@
                     authHtml += '</div>';
                     authorsDiv.innerHTML = authHtml;
                 }
-                buildBottom(article, galleys, pages, '', 0, 0);
+                buildBottom(article, galleys, pages, '');
             });
         });
 
